@@ -27,8 +27,8 @@ export default class extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const GNOME_VER = parseFloat(PACKAGE_VERSION);
         const SUPPORT_PINCH = (GNOME_VER < 46)||(GNOME_VER>=48.2);
-        const WEBSITE_LINK = "https://amarullz.com/";
-        const PAYPAL_LINK = "https://paypal.me/amarullz";
+        const WEBSITE_LINK = "https://github.com/qmko/windowgestures";
+        const PAYPAL_LINK = "https://github.com/qmko/windowgestures";
         const GNU_SOFTWARE = '<span size="small">' +
             'This program comes with absolutely no warranty.\n' +
             'See the <a href="https://gnu.org/licenses/old-licenses/gpl-2.0.html">' +
