@@ -11,6 +11,21 @@ GNOME 49 support.
 ## Installation
 [![Get from GNOME Extension](./gext.svg)](https://extensions.gnome.org/extension/6343/window-gestures/)
 
+### Local install from source/zip
+
+If you install this extension manually, make sure schemas are compiled in the extension directory:
+
+```bash
+cd ~/.local/share/gnome-shell/extensions/windowgestures-with-patches@qmko.github.io
+glib-compile-schemas schemas/
+```
+
+For packaging from this repository, use:
+
+```bash
+./build.sh
+```
+
 
 ## Features
  * Customizable actions for gestures
