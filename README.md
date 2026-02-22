@@ -9,7 +9,7 @@ Window Gestures with Patches is GNOME Shell extension for managing window with t
 GNOME 49 support.
 
 ## Installation
-[![Get from GNOME Extension](./gext.svg)](https://extensions.gnome.org/extension/6343/window-gestures/)
+[![Get from GNOME Extension](./gext.svg)](https://extensions.gnome.org/extension/9405/window-gestures-with-patches/)
 
 ### Local install from source/zip
 
