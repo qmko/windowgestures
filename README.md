@@ -1,3 +1,6 @@
+# IMPORTANT:
+This repo is a fork of an already existing gnome extension which was not working well for gnome 49. I have implemented some patches from the original repos for my own use.
+
 # Window Gestures
 
 Window Gestures is GNOME Shell extension for managing window with touchpad gestures.
