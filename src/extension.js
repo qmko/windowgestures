@@ -2504,9 +2504,12 @@ class Manager {
 
             let winCanMax = activeWin.allows_move() && activeWin.can_maximize();
             let winIsMaximized = activeWin.is_maximized();
-            let winMaxed = Meta.MaximizeFlags.BOTH == winIsMaximized;
+            if (typeof winIsMaximized !== "boolean") {
+                winIsMaximized = winIsMaximized !== Meta.MaximizeFlags.NONE;
+            }
+            let winMaxed = !!winIsMaximized;
             if (activeWin.isTiled) {
-                winIsMaximized = Meta.MaximizeFlags.VERTICAL;
+                winIsMaximized = true;
             }
             let winIsFullscreen = activeWin.is_fullscreen();
             let allowFullscreen = this._getEnableFullscreen();
