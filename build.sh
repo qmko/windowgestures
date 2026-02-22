@@ -10,11 +10,7 @@ UUID=$(python3 -c 'import json; print(json.load(open("metadata.json"))["uuid"])'
 ## Always compile schemas before packaging
 glib-compile-schemas schemas/
 
-## Zip whole files
-if command -v zip >/dev/null 2>&1; then
-	zip -r "../${UUID}.zip" ./*
-else
-	python3 -c "import shutil; shutil.make_archive('../${UUID}','zip','.')"
-fi
+## Create minimal extension package only
+python3 -c "import zipfile; files=['extension.js','metadata.json','prefs.js','stylesheet.css','schemas/org.gnome.shell.extensions.windowgestures.gschema.xml']; out='../${UUID}.zip'; z=zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED); [z.write(f, f) for f in files]; z.close()"
 
 cd ..
