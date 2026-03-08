@@ -1,5 +1,6 @@
 # IMPORTANT:
-This repo is a fork of an already existing gnome extension which was not working well for gnome 49. I have implemented some patches from the original repos for my own use.
+This repo is a fork of an already existing gnome extension which was not working well for gnome 49. I have implemented some patches from the original repos for my own use while making some changes to the code. If you encounter any bugs feel free to report them. 
+Only supports GNOME 49.
 
 # Window Gestures with Patches
 
