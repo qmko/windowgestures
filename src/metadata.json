@@ -4,13 +4,9 @@
   "name": "Window Gestures with Patches",
   "settings-schema": "org.gnome.shell.extensions.windowgestures",
   "shell-version": [
-    "45",
-    "46",
-    "47",
-    "48",
     "49"
   ],
   "url": "https://github.com/qmko/windowgestures",
   "uuid": "windowgestures-with-patches@qmko.github.io",
-  "version": 9
+  "version": 10
 }

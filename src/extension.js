@@ -26,33 +26,25 @@ import Mtk from 'gi://Mtk';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-// Window edge action
+// Window edge action flags
 const WindowEdgeAction = {
-    NONE: 0,                    // No action
-    WAIT_GESTURE: 0x01,         // Wait for gesture flag
-    MOVE: 0x02,                 // Move flag
-    RESIZE: 0x04,               // Resize flag
+    NONE: 0,
+    MOVE: 0x02,
+    RESIZE: 0x04,
 
-    GESTURE_LEFT: 0x10,         // Gesture Left
-    GESTURE_RIGHT: 0x20,        // Gesture Right
-    GESTURE_UP: 0x40,           // Gesture Up
-    GESTURE_DOWN: 0x80,         // Gesture Down
+    GESTURE_LEFT: 0x10,
+    GESTURE_RIGHT: 0x20,
+    GESTURE_UP: 0x40,
+    GESTURE_DOWN: 0x80,
 
-    GESTURE_UP_LEFT: 0x100,     // Gesture Up Left
-    GESTURE_UP_RIGHT: 0x200,    // Gesture Up Right
-
-    GESTURE_HORIZONTAL: 0x400,  // Non-Window Gestures
-    GESTURE_VERTICAL: 0x800,
-
-    RESIZE_LEFT: 0x1000,        // Resize Flags
+    RESIZE_LEFT: 0x1000,
     RESIZE_RIGHT: 0x2000,
     RESIZE_TOP: 0x4000,
     RESIZE_BOTTOM: 0x8000,
 
-    MOVE_SNAP_TOP: 0x10000,     // Snap Flags
+    MOVE_SNAP_TOP: 0x10000,
     MOVE_SNAP_LEFT: 0x20000,
     MOVE_SNAP_RIGHT: 0x40000
-
 };
 
 // Window Blacklist Classes
@@ -63,12 +55,8 @@ const WindowClassBlacklist = [
 // Manager Class
 class Manager {
 
-    // Init Extension
     constructor(ext) {
-        // Get settings
         this._settings = ext.getSettings();
-
-        // Gestures are hooked by WGS
         this._hooked = false;
 
         // Create virtual devices
@@ -80,7 +68,6 @@ class Manager {
             Clutter.InputDeviceType.KEYBOARD_DEVICE
         );
 
-        // Init variables - keep enable() clean
         this._clearVars();
 
         // Capture Touchpad Event
@@ -89,10 +76,7 @@ class Manager {
             this._touchpadEvent.bind(this)
         );
 
-        // init 3 or 4 fingers config support
         this._initFingerCountFlip();
-
-        // action widget holder
         this._actionWidgets = {};
 
         // Desktop Theme Setting
@@ -101,25 +85,20 @@ class Manager {
         });
     }
 
-    // Clear potentially running timeout/interval
     destroyTimers() {
         if (this._holdTo) {
-            // hold waiter
             clearTimeout(this._holdTo);
             this._holdTo = null;
         }
         if (this._actionWidgets.resetWinlist) {
-            // Alt+Tab timeout
             clearTimeout(this._actionWidgets.resetWinlist);
             this._actionWidgets.resetWinlist = null;
         }
         if (this._keyRepeatInterval) {
-            // Key repeat interval
             clearInterval(this._keyRepeatInterval);
             this._keyRepeatInterval = null;
         }
         if (this._flingInterval) {
-            // Kinetic interval
             clearInterval(this._flingInterval);
             this._flingInterval = null;
         }
@@ -133,53 +112,27 @@ class Manager {
         }
     }
 
-    // Cleanup Extension
     destroy() {
-        // clear timers
         this.destroyTimers();
-
-        // restore default GNOME 3 fingers gesture
         this._restoreFingerCountFlip();
-
-        // Release Touchpad Event Capture
         global.stage.disconnect(this._gestureCallbackID);
 
-        // Cleanup virtual devices
         this._virtualTouchpad = null;
         this._virtualKeyboard = null;
 
-        // Cleanup all variables
         this._clearVars();
         this._isettings = null;
         this._settings = null;
-        this._ShaderClass = null;
     }
 
-    // Initialize variables
     _clearVars() {
-        // Target window to manage
         this._targetWindow = null;
-
-        // Mouse start position
-        this._startPos = {
-            x: 0, y: 0
-        };
-
-        // Mouse start position
-        this._movePos = {
-            x: 0, y: 0
-        };
-
-        // Monitor Id
+        this._startPos = { x: 0, y: 0 };
+        this._movePos = { x: 0, y: 0 };
         this._monitorId = 0;
-
-        // Monitor Workarea
         this._monitorArea = null;
-
-        // Starting Window Area
         this._startWinArea = null;
 
-        // Edge Action
         this._edgeAction = WindowEdgeAction.NONE;
         this._edgeGestured = 0;
         this._swipeIsWin = false;
@@ -188,30 +141,22 @@ class Manager {
         this._tapHoldWin = null;
         this._tapHoldTick = 0;
 
-        // Pinch
         this._gesture = {
             begin: false,
             fingers: 0,
             progress: 0,
-
             velocity: null,
-
             action: 0,
             action_id: 0,
             action_cmp: 0
         };
-
-        // Clear window tile preview
-        // this._hidePreview();
     }
 
     // Init 3 or 4 finger count switch mode
     _initFingerCountFlip() {
-        // Move 3-4 Finger Gesture
         /*
          * Original Hook Logic From (swap-finger-gestures):
          * https://github.com/icedman/swap-finger-gestures-3-4
-         * 
          */
         this._swipeMods = [
             Main.overview._swipeTracker._touchpadGesture,
@@ -250,9 +195,7 @@ class Manager {
         });
     }
 
-    // Restore 3 or 4 finger count switch mode
     _restoreFingerCountFlip() {
-        // Restore 3 finger gesture
         this._swipeMods.forEach((g) => {
             global.stage.disconnectObject(g);
             global.stage.connectObject(
@@ -264,7 +207,6 @@ class Manager {
         this._swipeMods = [];
     }
 
-    // Is dark theme?
     _isDarkTheme() {
         let uit = this._settings.get_int('ui-theme');
         if (uit == 0) {
@@ -274,13 +216,11 @@ class Manager {
         return (uit == 2);
     }
 
-    // Create UI Indicator
     _createUi(ui_class, x, y, w, h, icon) {
         let ui = new St.Widget({ style_class: ui_class });
         if (this._isDarkTheme()) {
             ui.add_style_class_name("wgs-dark");
         }
-        // ui.set_clip_to_allocation(true);
         ui._icon = null;
         ui._parent = Main.layoutManager.uiGroup;
         if (icon) {
@@ -297,14 +237,6 @@ class Manager {
             ui.show();
             prop.mode = Clutter.AnimationMode.EASE_OUT_QUAD;
             prop.duration = duration;
-            ui.ease(prop);
-        };
-        ui.viewHide = (prop) => {
-            prop.mode = Clutter.AnimationMode.EASE_OUT_QUAD;
-            prop.duration = duration;
-            prop.onStopped = () => {
-                ui.hide();
-            };
             ui.ease(prop);
         };
         ui.aniRelease = (progress) => {
@@ -328,7 +260,6 @@ class Manager {
             }
         };
         ui.release = () => {
-            // Cleanup
             ui.hide();
             ui._parent.remove_child(ui);
             if (ui._icon) {
@@ -343,7 +274,6 @@ class Manager {
         return ui;
     }
 
-    // Create Shader Effect
     _createShader(type, actor, name) {
         let fx = new Clutter.ShaderEffect(
             { shader_type: Clutter.ShaderType.FRAGMENT_SHADER }
@@ -369,7 +299,7 @@ class Manager {
         fx.set_uniform_value('tex', 0);
         fx.setValue = function (v) {
             fx.set_uniform_value('value', v);
-        }
+        };
         if (actor) {
             fx._fxname = name;
             actor.fx = fx;
@@ -391,11 +321,7 @@ class Manager {
 
     // Velocity functions
     _velocityInit() {
-        let vel = {
-            data: [],
-            prev: 0
-        };
-        return vel;
+        return { data: [], prev: 0 };
     }
     _velocityTrim(vel) {
         const thresholdTime = this._tick() - 150;
@@ -434,8 +360,7 @@ class Manager {
         now.v *= 0.98;
         now.n++;
         if (me._velocityFlingQueue.length != 1) {
-            // Another fling called
-            now.cb(1, target);
+            now.cb(1, now.target);
             clearIt = true;
         }
         else if (now.target >= now.max || now.n >= now.maxframe) {
@@ -484,37 +409,22 @@ class Manager {
         return true;
     }
 
-    // Get padding edge size
+    // Settings accessors
     _edgeSize() {
         return this._settings.get_int('edge-size');
     }
-
-    // Get top padding edge size
     _topEdgeSize() {
         return this._settings.get_int('top-edge-size');
     }
-
-    // Get gesture threshold
     _gestureThreshold() {
         return this._settings.get_int('gesture-threshold');
     }
-
-    // Get acceleration
     _getAcceleration() {
         return (this._settings.get_int('gesture-acceleration') * 0.1);
     }
-
-    // Get gesture threshold
-    _gestureCancelThreshold() {
-        return this._settings.get_int('gesture-cancel-threshold');
-    }
-
-    // Is 3 Finger
     _gestureNumFinger() {
         return this._settings.get_boolean("three-finger") ? 3 : 4;
     }
-
-    // Functions Settings
     _getUseActiveWindow() {
         return this._settings.get_boolean("use-active-window");
     }
@@ -523,9 +433,6 @@ class Manager {
     }
     _getEnableMove() {
         return this._settings.get_boolean("fn-move");
-    }
-    _getEnableMaxSnap() {
-        return this._settings.get_boolean("fn-maximized-snap");
     }
     _getEnableMoveSnap() {
         return this._settings.get_boolean("fn-move-snap");
@@ -546,17 +453,14 @@ class Manager {
         return this._settings.get_boolean("taphold-move");
     }
 
-    // Is On Overview
     _isOnOverview() {
         return Main.overview._shown;
     }
 
-    // Check edge flags
     _isEdge(edge) {
         return ((this._edgeAction & edge) == edge);
     }
 
-    // Show Preview
     _showPreview(rx, ry, rw, rh) {
         if (global.display.get_focus_window() == null) {
             return;
@@ -569,15 +473,17 @@ class Manager {
         );
     }
 
-    // Find Target Window
+    _hidePreview() {
+        global.window_manager.emit("hide-tile-preview");
+    }
+
     _findPointerWindow() {
         let target = null;
-        let [pointerX, pointerY, pointerZ] = global.get_pointer();
+        let [pointerX, pointerY] = global.get_pointer();
         let currActor = global.stage.get_actor_at_pos(
             Clutter.PickMode.REACTIVE, pointerX, pointerY
         );
         if (currActor) {
-            // Find root window for current actor
             let currWindow = currActor.get_parent();
             let i = 0;
             while (currWindow && !currWindow.get_meta_window) {
@@ -587,56 +493,37 @@ class Manager {
                     break;
                 }
             }
-            // Set meta window as target window to manage
             target = currWindow?.get_meta_window();
         }
         return target;
     }
 
-    // Get Alt Tabs List
-    _getWindowTabList() {
-        let wm = global.workspace_manager;
-        let workspace = wm.get_active_workspace();
+    // Get window tab list, optionally sorted by process creation time
+    _getWindowTabList(fixedOrder) {
+        let workspace = global.workspace_manager.get_active_workspace();
         let windows = global.display.get_tab_list(
             Meta.TabList.NORMAL_ALL, workspace
         );
-        return windows.map(w => {
-            return w.is_attached_dialog() ? w.get_transient_for() : w;
-        }).filter((w, i, a) => !w.skip_taskbar && a.indexOf(w) === i);
-    }
-
-    // Get Window Tab List with Fixed Order
-    _getWindowTabListFixed() {
-        let wm = global.workspace_manager;
-        let workspace = wm.get_active_workspace();
-        let windows = global.display.get_tab_list(
-            Meta.TabList.NORMAL_ALL, workspace
-        );
-
-        // Filter and map windows
-        let filteredWindows = windows.map(w => {
+        let filtered = windows.map(w => {
             return w.is_attached_dialog() ? w.get_transient_for() : w;
         }).filter((w, i, a) => !w.skip_taskbar && a.indexOf(w) === i);
 
-        // Sort by process creation time (oldest first)
-        filteredWindows.sort((a, b) => {
-            let timeA = this._getProcessCreationTime(a.get_pid());
-            let timeB = this._getProcessCreationTime(b.get_pid());
-            return timeA - timeB;
-        });
-
-        return filteredWindows;
+        if (fixedOrder) {
+            filtered.sort((a, b) => {
+                return this._getProcessCreationTime(a.get_pid())
+                    - this._getProcessCreationTime(b.get_pid());
+            });
+        }
+        return filtered;
     }
 
-    // Get Application List
-    _getApplicationList() {
-        let wm = global.workspace_manager;
-        let workspace = wm.get_active_workspace();
+    // Get application list, optionally sorted by process creation time
+    _getApplicationList(fixedOrder) {
+        let workspace = global.workspace_manager.get_active_workspace();
         let windows = global.display.get_tab_list(
             Meta.TabList.NORMAL_ALL, workspace
         );
 
-        // Group windows by application
         let appMap = new Map();
         windows.forEach(w => {
             let window = w.is_attached_dialog() ? w.get_transient_for() : w;
@@ -651,23 +538,26 @@ class Manager {
             appMap.get(app).push(window);
         });
 
-        // Convert to array of applications with their windows
-        // Sort by most recently used (active window first)
-        let activeWindow = global.display.get_focus_window();
-        let apps = Array.from(appMap.entries()).map(([app, windows]) => ({
-            app: app,
-            windows: windows,
-            activeWindow: windows[0] // First window as representative
+        let apps = Array.from(appMap.entries()).map(([app, wins]) => ({
+            app, windows: wins, activeWindow: wins[0]
         }));
 
-        // Put active application first
-        if (activeWindow) {
-            let activeApp = this._winmanWinApp(activeWindow);
-            if (activeApp) {
-                let activeIndex = apps.findIndex(a => a.app === activeApp);
-                if (activeIndex > 0) {
-                    let activeAppData = apps.splice(activeIndex, 1)[0];
-                    apps.unshift(activeAppData);
+        if (fixedOrder) {
+            apps.forEach(a => {
+                a.processTime = this._getProcessCreationTime(
+                    a.activeWindow.get_pid()
+                );
+            });
+            apps.sort((a, b) => a.processTime - b.processTime);
+        } else {
+            let activeWindow = global.display.get_focus_window();
+            if (activeWindow) {
+                let activeApp = this._winmanWinApp(activeWindow);
+                if (activeApp) {
+                    let idx = apps.findIndex(a => a.app === activeApp);
+                    if (idx > 0) {
+                        apps.unshift(apps.splice(idx, 1)[0]);
+                    }
                 }
             }
         }
@@ -675,49 +565,6 @@ class Manager {
         return apps;
     }
 
-    // Get Application List with Fixed Order
-    _getApplicationListFixed() {
-        let wm = global.workspace_manager;
-        let workspace = wm.get_active_workspace();
-        let windows = global.display.get_tab_list(
-            Meta.TabList.NORMAL_ALL, workspace
-        );
-
-        // Group windows by application
-        let appMap = new Map();
-        windows.forEach(w => {
-            let window = w.is_attached_dialog() ? w.get_transient_for() : w;
-            if (!window || window.skip_taskbar) return;
-
-            let app = this._winmanWinApp(window);
-            if (!app) return;
-
-            if (!appMap.has(app)) {
-                appMap.set(app, []);
-            }
-            appMap.get(app).push(window);
-        });
-
-        // Convert to array of applications with their windows
-        let apps = Array.from(appMap.entries()).map(([app, windows]) => ({
-            app: app,
-            windows: windows,
-            activeWindow: windows[0], // First window as representative
-            processTime: this._getProcessCreationTime(windows[0].get_pid()) // Use process creation time for sorting
-        }));
-
-        // Sort by process creation time (oldest first)
-        apps.sort((a, b) => a.processTime - b.processTime);
-
-        return apps;
-    }
-
-    // Hide Preview
-    _hidePreview() {
-        global.window_manager.emit("hide-tile-preview");
-    }
-
-    // Simulate keypress (up -> down)
     _sendKeyPress(combination) {
         combination.forEach(key => this._virtualKeyboard.notify_keyval(
             Clutter.get_current_event_time(), key, Clutter.KeyState.PRESSED)
@@ -728,29 +575,23 @@ class Manager {
             ));
     }
 
-    // Move Mouse Pointer
     _movePointer(x, y) {
         if (!this._isActiveWin) {
-            // Move only if not use active window
             this._virtualTouchpad.notify_relative_motion(
                 Meta.CURRENT_TIME, x, y
             );
         }
     }
 
-    // window management
     _winmanWinApp(win) {
         return Shell.WindowTracker.get_default()
             .get_window_app(win);
-        // App.create_icon_texture;
     }
 
-    // Snap Window
     _setSnapWindow(snapRight) {
         if (this._targetWindow == null) {
             return;
         }
-        // TODO: Using non key shortcut for snap left/right
         if (snapRight) {
             this._sendKeyPress([Clutter.KEY_Super_L, Clutter.KEY_Right]);
         }
@@ -759,27 +600,7 @@ class Manager {
         }
     }
 
-    // Move to Workspace
-    _moveWindowWorkspace(moveRight) {
-        if ((this._targetWindow == null) ||
-            !Meta.prefs_get_dynamic_workspaces()) {
-            return;
-        }
-        let wsid = this._targetWindow.get_workspace().index();
-        if (wsid == 0 && !moveRight) {
-            this._insertWorkspace(0, this._targetWindow);
-            return;
-        }
-        let tw = this._targetWindow.get_workspace()
-            .get_neighbor(moveRight ? Meta.MotionDirection.RIGHT :
-                Meta.MotionDirection.LEFT);
-        this._targetWindow.change_workspace(tw);
-        this._targetWindow.activate(Meta.CURRENT_TIME);
-    }
-
-    // Insert new workspace
     _insertWorkspace(pos, chkwin) {
-        // Main.wm.insertWorkspace(0);
         let wm = global.workspace_manager;
         if (!Meta.prefs_get_dynamic_workspaces()) {
             return -1;
@@ -788,16 +609,16 @@ class Manager {
         let windows = global.get_window_actors().map(a => a.meta_window);
         windows.forEach(window => {
             if (chkwin && chkwin == window)
-                return -1;
+                return;
             if (window.get_transient_for() != null)
-                return -1;
+                return;
             if (window.is_override_redirect())
-                return -1;
+                return;
             if (window.on_all_workspaces)
-                return -1;
+                return;
             let index = window.get_workspace().index();
             if (index < pos)
-                return -1;
+                return;
             window.change_workspace_by_index(index + 1, true);
         });
         if (chkwin) {
@@ -809,24 +630,15 @@ class Manager {
         }
         return pos;
     }
+
     _isDynamicWorkspace() {
         return Meta.prefs_get_dynamic_workspaces();
-    }
-
-    // Have Left Workspace
-    _workspaceHavePrev() {
-        if (this._targetWindow == null) {
-            return false;
-        }
-        return (this._targetWindow.get_workspace().index() > 0);
     }
 
     _resetWinPos() {
         if (this._targetWindow == null) {
             return;
         }
-
-        // Reset
         this._targetWindow.move_frame(
             true,
             this._startWinArea.x,
@@ -834,13 +646,10 @@ class Manager {
         );
     }
 
-    // Activate Target Window
     _activateWindow() {
         if (this._targetWindow == null) {
             return;
         }
-
-        // Activate window if not focused yet
         if (!this._targetWindow.has_focus()) {
             this._targetWindow.activate(
                 Meta.CURRENT_TIME
@@ -848,7 +657,6 @@ class Manager {
         }
     }
 
-    // Swipe window move handler
     _swipeUpdateMove() {
         this._activateWindow();
 
@@ -861,16 +669,11 @@ class Manager {
                 this._startWinArea.y = r.y;
                 this._startWinArea.width = r.width;
                 this._startWinArea.height = r.height;
-                // this._targetWindow.move_resize_frame(
-                //     true,
-                //     r.x, r.y, r.width, r.height
-                // );
                 this._sendKeyPress([Clutter.KEY_Super_L, Clutter.KEY_Down]);
             }
         }
 
         let allowMoveSnap = this._getEnableMoveSnap();
-        // Move calculation
         let mX = this._monitorArea.x;
         let mY = this._monitorArea.y;
         let mW = this._monitorArea.width;
@@ -878,7 +681,7 @@ class Manager {
         let winX = this._startWinArea.x + this._movePos.x;
         let winY = this._startWinArea.y + this._movePos.y;
         let winR = winX + this._startWinArea.width;
-        // Move action
+
         this._targetWindow.move_frame(
             true,
             winX, winY
@@ -920,17 +723,14 @@ class Manager {
         return Clutter.EVENT_STOP;
     }
 
-    // Swipe window resize handler
     _swipeUpdateResize(dx, dy) {
         this._activateWindow();
-        // Move cursor pointer
         this._movePointer(
             (this._isEdge(WindowEdgeAction.RESIZE_LEFT) ||
                 this._isEdge(WindowEdgeAction.RESIZE_RIGHT)) ? dx : 0,
             (this._isEdge(WindowEdgeAction.RESIZE_TOP) ||
                 this._isEdge(WindowEdgeAction.RESIZE_BOTTOM)) ? dy : 0
         );
-        // Resize actions
         let tX = this._startWinArea.x;
         let tY = this._startWinArea.y;
         let tW = this._startWinArea.width;
@@ -953,11 +753,8 @@ class Manager {
         let tB = tY + tH;
         let mX = this._monitorArea.x;
         let mY = this._monitorArea.y;
-        let mW = this._monitorArea.width;
-        let mH = this._monitorArea.height;
-        let mR = mX + mW;
-        let mB = mY + mH;
-        // edge
+        let mR = mX + this._monitorArea.width;
+        let mB = mY + this._monitorArea.height;
         if (tX < mX) {
             tX = mX;
             tW = tR - tX;
@@ -972,7 +769,6 @@ class Manager {
         if (tB > mB) {
             tH = mB - tY;
         }
-        // Resize Window
         this._targetWindow.move_resize_frame(
             true,
             tX, tY, tW, tH
@@ -980,37 +776,27 @@ class Manager {
         return Clutter.EVENT_STOP;
     }
 
-    // Begin swipe gesture
     _swipeBegin(numfingers) {
-        // Swipe Variables
         this._swipeIsWin = (numfingers == this._gestureNumFinger());
 
-        // Workspace gesture only not on overview
         if (this._isOnOverview() && !this._swipeIsWin) {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        // Init gesture variables
         this._gesture.begin = true;
         this._gesture.fingers = numfingers;
         this._gesture.progress = 0;
-
-        // Action Variables
         this._gesture.action = 0;
         this._gesture.action_cmp = 0;
         this._gesture.action_id = 0;
-
-        // Velocity Variables
         this._gesture.velocity = this._velocityInit();
         this._velocityAppend(this._gesture.velocity, 0);
 
-        // Get current mouse position
-        let [pointerX, pointerY, pointerZ] = global.get_pointer();
+        let [pointerX, pointerY] = global.get_pointer();
         this._startPos.x = pointerX;
         this._startPos.y = pointerY;
         this._movePos.x = this._movePos.y = 0;
 
-        // Configs
         let allowResize = this._getEnableResize();
         let allowMove = this._getEnableMove();
         this._isActiveWin = false;
@@ -1033,7 +819,6 @@ class Manager {
             this._targetWindow = this._findPointerWindow();
         }
         if (!this._targetWindow) {
-            // Get Active Window
             this._targetWindow = global.display.get_focus_window();
             if (!this._targetWindow) {
                 return this._swipeIsWin ?
@@ -1043,30 +828,22 @@ class Manager {
             this._isActiveWin = true;
         }
 
-        // Set opener window as target if it was dialog
         if (this._targetWindow.is_attached_dialog()) {
             this._targetWindow = this._targetWindow.get_transient_for();
         }
 
-        // Check blacklist window
         if (this._isWindowBlacklist(this._targetWindow)) {
             this._targetWindow = null;
             return this._swipeIsWin ?
                 Clutter.EVENT_STOP : Clutter.EVENT_PROPAGATE;
         }
 
-        // Get monitor area
         this._monitorArea = this._targetWindow.get_work_area_current_monitor();
-
-        // Get monitor id
         this._monitorId = global.display.get_monitor_index_for_rect(
             this._monitorArea
         );
-
-        // Get start frame rectangle
         this._startWinArea = this._targetWindow.get_frame_rect();
 
-        // Window area as local value
         let wLeft = this._startWinArea.x;
         let wTop = this._startWinArea.y;
         let wRight = wLeft + this._startWinArea.width;
@@ -1076,28 +853,21 @@ class Manager {
         let w34X = wLeft + ((this._startWinArea.width / 3) * 2);
         let w34Y = wTop + ((this._startWinArea.height / 3) * 2);
 
-        // Detect window edge
         let edge = this._edgeSize();
         let topEdge = this._topEdgeSize();
 
-        // Default edge: need move event for more actions
         this._edgeAction = WindowEdgeAction.NONE;
         this._edgeGestured = 0;
 
-        // Check allow resize
         if (this._swipeIsWin && !this._isActiveWin && allowResize &&
             this._targetWindow.allows_resize() &&
             this._targetWindow.allows_move() &&
             !this._targetWindow.isTiled && !isTapHoldAction) {
-            // Edge cursor position detection
             if (this._startPos.y >= wBottom - edge) {
                 if (this._startPos.y <= wBottom) {
-                    // Cursor on bottom of window
                     this._edgeAction =
                         WindowEdgeAction.RESIZE |
                         WindowEdgeAction.RESIZE_BOTTOM;
-
-                    // 1/3 from left|right
                     if (this._startPos.x <= wThirdX) {
                         this._edgeAction |= WindowEdgeAction.RESIZE_LEFT;
                     }
@@ -1109,19 +879,16 @@ class Manager {
             else {
                 if (this._startPos.x >= wLeft && this._startPos.x <= wRight) {
                     if (this._startPos.x <= wLeft + edge) {
-                        // Cursor on left side of window
                         this._edgeAction =
                             WindowEdgeAction.RESIZE |
                             WindowEdgeAction.RESIZE_LEFT;
                     }
                     else if (this._startPos.x >= wRight - edge) {
-                        // Cursor on right side of window
                         this._edgeAction =
                             WindowEdgeAction.RESIZE |
                             WindowEdgeAction.RESIZE_RIGHT;
                     }
                     if (this._isEdge(WindowEdgeAction.RESIZE)) {
-                        // 1/3 from top|bottom
                         if (this._startPos.y <= wThirdY) {
                             this._edgeAction |= WindowEdgeAction.RESIZE_TOP;
                         }
@@ -1136,7 +903,6 @@ class Manager {
             let setmove = false;
             if (this._getTapHoldMove()) {
                 if (this._tapHold == this._gestureNumFinger()) {
-                    // Tap and hold
                     setmove = true;
                 }
             }
@@ -1145,7 +911,6 @@ class Manager {
                 this._startPos.x >= wLeft &&
                 this._startPos.y >= wTop &&
                 this._startPos.y <= wTop + topEdge) {
-                // Mouse in top side of window
                 setmove = true;
             }
             if (setmove) {
@@ -1169,11 +934,9 @@ class Manager {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        // Moving coordinate
         this._movePos.x += dx;
         this._movePos.y += dy;
 
-        // Move & Resize Handler
         if (this._isEdge(WindowEdgeAction.MOVE)) {
             return this._swipeUpdateMove();
         }
@@ -1181,7 +944,6 @@ class Manager {
             return this._swipeUpdateResize(dx, dy);
         }
 
-        // Get threshold setting
         let threshold = this._gestureThreshold();
         let combineTrigger = this._gestureThreshold() * 2;
         let trigger = (threshold / 4) + 1;
@@ -1189,7 +951,6 @@ class Manager {
         let absX = Math.abs(this._movePos.x);
         let absY = Math.abs(this._movePos.y);
 
-        // Find gesture directions
         if (this._edgeAction == WindowEdgeAction.NONE) {
             if (absX >= trigger || absY >= trigger) {
                 if (absX > absY) {
@@ -1306,7 +1067,6 @@ class Manager {
             if (absX >= trigger && ((vert == 1 && this._swipeIsWin) ||
                 (vert == 2 && !this._swipeIsWin))) {
                 if (vert == 1 || prog == 0) {
-                    // Combination gesture (Down + Left/Right)
                     if (this._movePos.x <= 0 - combineTrigger) {
                         this._edgeAction |= WindowEdgeAction.GESTURE_LEFT;
                         this._gesture.velocity = this._velocityInit();
@@ -1327,7 +1087,6 @@ class Manager {
         else if (horiz) {
             if (this._isEdge(WindowEdgeAction.GESTURE_UP)) {
                 vert = 1;
-                // Reset to single gesture
                 if (Math.abs(this._movePos.x) < combineTrigger) {
                     this._edgeAction = WindowEdgeAction.GESTURE_UP;
                     this._gesture.velocity = this._velocityInit();
@@ -1338,7 +1097,6 @@ class Manager {
             }
             else if (this._isEdge(WindowEdgeAction.GESTURE_DOWN)) {
                 vert = 2;
-                // Reset to single gesture
                 if (Math.abs(this._movePos.x) < combineTrigger) {
                     this._edgeAction = WindowEdgeAction.GESTURE_DOWN;
                     this._gesture.velocity = this._velocityInit();
@@ -1349,7 +1107,6 @@ class Manager {
             }
         }
 
-        // Switch gestures direction
         if (
             (vert == 1 && (this._movePos.y > 0 - trigger)) ||
             (vert == 2 && (this._movePos.y < 0)) ||
@@ -1370,53 +1127,43 @@ class Manager {
             }
         }
 
-        // Limit progress
-        let oprog = prog;
         if (prog >= 1) {
             prog = 1.0;
         }
         this._gesture.action = 0;
 
-        // Set action
         if (vert == 0) {
-            this._gesture.action = horiz; // left=1, right=2
+            this._gesture.action = horiz;
         }
         else {
             if (!this._swipeIsWin) {
                 if (horiz && vert == 2) {
-                    // down + horiz
-                    this._gesture.action = horiz + 4; // left=5, right=6
+                    this._gesture.action = horiz + 4;
                 }
                 else {
-                    // vert
-                    this._gesture.action = (vert == 2) ? 4 : 7; // d=4, u=7
+                    this._gesture.action = (vert == 2) ? 4 : 7;
                 }
             }
             else {
                 if (horiz && vert == 1) {
-                    // up + horiz
-                    this._gesture.action = horiz + 50; // left=51, right=52
+                    this._gesture.action = horiz + 50;
                 }
                 else {
-                    // vert
                     this._gesture.action = (vert == 2) ?
                         ((this._edgeGestured == 1) ? 53 : 3) :
-                        50; // up=50, dn=53, up+dn=3
+                        50;
                 }
             }
         }
 
-        // Cancel action
         if (this._gesture.action_cmp &&
             (this._gesture.action != this._gesture.action_cmp)) {
-            // Send Cancel State
             let aid = this._actionIdGet(this._gesture.action_cmp);
             if (aid) {
                 this._runAction(aid, 1, 0);
             }
         }
 
-        // Update progress & velocity
         this._gesture.progress = prog;
         this._velocityAppend(this._gesture.velocity,
             this._gesture.progress);
@@ -1427,7 +1174,7 @@ class Manager {
                 if (aid >= 50) {
                     this._activateWindow();
                 }
-                this._runAction(aid, 0, this._gesture.progress, oprog);
+                this._runAction(aid, 0, this._gesture.progress);
             }
             this._gesture.action_cmp = this._gesture.action;
         }
@@ -1436,7 +1183,6 @@ class Manager {
     }
 
     _swipeEnd() {
-        // Check move snap
         if (this._isEdge(WindowEdgeAction.MOVE)) {
             this._hidePreview();
             if (this._isEdge(WindowEdgeAction.MOVE_SNAP_TOP)) {
@@ -1458,7 +1204,6 @@ class Manager {
             return Clutter.EVENT_STOP;
         }
 
-        // Gesture Release
         let retval = (!this._swipeIsWin && !this._hooked) ?
             Clutter.EVENT_PROPAGATE : Clutter.EVENT_STOP;
         this._hooked = false;
@@ -1467,7 +1212,6 @@ class Manager {
             if (aid) {
                 let issnapaction = (aid == 51 || aid == 52);
                 if ((this._gesture.progress < 1.0) && !issnapaction) {
-                    // Fling Velocity
                     let vel = this._velocityCalc(this._gesture.velocity);
                     if (vel > 0.001) {
                         let me = this;
@@ -1489,19 +1233,15 @@ class Manager {
         return retval;
     }
 
-    // Swipe Handler
     _swipeEventHandler(actor, event) {
         let numfingers = event.get_touchpad_gesture_finger_count();
         if (numfingers != 3 && numfingers != 4) {
             return Clutter.EVENT_PROPAGATE;
         }
-        // Process gestures state
         switch (event.get_gesture_phase()) {
             case Clutter.TouchpadGesturePhase.BEGIN:
-                // Begin event
                 return this._swipeBegin(numfingers);
             case Clutter.TouchpadGesturePhase.UPDATE:
-                // Update / move event
                 let [dx, dy] = event.get_gesture_motion_delta();
                 return this._swipeUpdate(
                     dx * this._getAcceleration(),
@@ -1511,7 +1251,6 @@ class Manager {
         return this._swipeEnd();
     }
 
-    // Get Current Action Id
     _pinchGetCurrentActionId() {
         if (this._gesture.begin && this._gesture.action != 0) {
             if (this._gesture.action != this._gesture.action_cmp) {
@@ -1527,13 +1266,11 @@ class Manager {
         return 0;
     }
 
-    // Update Pinch
     _pinchUpdate(pinch_scale) {
         if (this._gesture.begin) {
             let pIn = (this._getPinchInScale() / 100.0);
             let pOut = (this._getPinchOutScale() / 100.0);
 
-            // Get prediction action & current progress position
             if (pinch_scale < 1.0) {
                 if (pinch_scale < pIn) {
                     pinch_scale = pIn;
@@ -1555,7 +1292,6 @@ class Manager {
 
             if (this._gesture.action_cmp &&
                 (this._gesture.action != this._gesture.action_cmp)) {
-                // Send Cancel State
                 let aid = this._actionIdGet(
                     (this._gesture.fingers == 3) ?
                         this._gesture.action_cmp + 7 :
@@ -1564,8 +1300,6 @@ class Manager {
                 if (aid) {
                     this._runAction(aid, 1, 0);
                 }
-
-                // Reset velocity
                 this._gesture.velocity = this._velocityInit();
                 this._velocityAppend(this._gesture.velocity, 0);
             }
@@ -1582,30 +1316,22 @@ class Manager {
         return Clutter.EVENT_STOP;
     }
 
-    // Pinch Begin
     _pinchBegin(numfingers) {
-        // Pinch Variables
         this._gesture.begin = true;
         this._gesture.fingers = numfingers;
         this._gesture.progress = 0;
-
-        // Action Variables
         this._gesture.action = 0;
         this._gesture.action_cmp = 0;
         this._gesture.action_id = 0;
-
-        // Velocity Variables
         this._gesture.velocity = this._velocityInit();
         this._velocityAppend(this._gesture.velocity, 0);
         return Clutter.EVENT_STOP;
     }
 
-    // End Pinch
     _pinchEnd() {
         let action_id = this._pinchGetCurrentActionId();
         if (action_id) {
             if (this._gesture.progress < 1.0) {
-                // Fling Velocity
                 let vel = this._velocityCalc(this._gesture.velocity);
                 if (vel > 0.001) {
                     let me = this;
@@ -1626,7 +1352,6 @@ class Manager {
         return Clutter.EVENT_STOP;
     }
 
-    // Pinch Handler
     _pinchEventHandler(actor, event) {
         if (!this._getPinchEnabled()) {
             return Clutter.EVENT_PROPAGATE;
@@ -1636,8 +1361,6 @@ class Manager {
             return Clutter.EVENT_PROPAGATE;
         }
         const pinch_scale = event.get_gesture_pinch_scale();
-
-        // Process gestures state
         switch (event.get_gesture_phase()) {
             case Clutter.TouchpadGesturePhase.BEGIN:
                 return this._pinchBegin(numfingers);
@@ -1677,14 +1400,14 @@ class Manager {
                             scale_y: 1.05,
                             scale_x: 1.05,
                             onStopped: () => {
-                                activeWin?.get_compositor_private().ease({
+                                activeWin?.get_compositor_private()?.ease({
                                     duration: 100,
                                     mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                                     scale_y: 1,
                                     scale_x: 1,
                                     onStopped: () => {
                                         activeWin?.get_compositor_private()
-                                            .set_pivot_point(0, 0);
+                                            ?.set_pivot_point(0, 0);
                                     }
                                 });
                             }
@@ -1702,8 +1425,8 @@ class Manager {
         }
         return Clutter.EVENT_PROPAGATE;
     }
+
     _tapHoldHandler(actor, event) {
-        // Process gestures state
         let numfingers = event.get_touchpad_gesture_finger_count();
         if (numfingers != 3 && numfingers != 4) {
             return Clutter.EVENT_PROPAGATE;
@@ -1714,25 +1437,16 @@ class Manager {
         return this._tapHoldGesture(0, numfingers);
     }
 
-    // Touch Event Handler
     _touchpadEvent(actor, event) {
-        // log("_touchpadEvent = " + event.type());
-        // Process pinch
         if (event.type() == Clutter.EventType.TOUCHPAD_PINCH)
             return this._pinchEventHandler(actor, event);
-
-        // Process swipe
         if (event.type() == Clutter.EventType.TOUCHPAD_SWIPE)
             return this._swipeEventHandler(actor, event);
-
-        // Process tap hold
         if (event.type() == Clutter.EventType.TOUCHPAD_HOLD)
             return this._tapHoldHandler(actor, event);
-
         return Clutter.EVENT_PROPAGATE;
     }
 
-    // Get Action Id
     _actionIdGet(type) {
         let cfg_name = "";
         switch (type) {
@@ -1747,11 +1461,10 @@ class Manager {
             case 9: cfg_name = "pinch3-out"; break;
             case 10: cfg_name = "pinch4-in"; break;
             case 11: cfg_name = "pinch4-out"; break;
-            case 24: return 24; // Next application - direct return
-            case 25: return 25; // Previous application - direct return
+            case 24: return 24;
+            case 25: return 25;
             default:
                 if (type >= 50 && type <= 53) {
-                    // Max & Snap
                     return type;
                 }
                 return 0;
@@ -1759,21 +1472,38 @@ class Manager {
         return this._settings.get_int(cfg_name);
     }
 
-    // Run Action
-    _runAction(id, state, progress, oprog) {
+    // Ease-restore a compositor actor back to normal, then run cleanup
+    _easeRestoreActor(actor, progress, cleanup) {
+        if (actor) {
+            actor.ease({
+                duration: Math.round(200 * progress),
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                opacity: 255,
+                scale_x: 1,
+                scale_y: 1,
+                onStopped: () => {
+                    actor?.set_pivot_point(0, 0);
+                    cleanup();
+                }
+            });
+        } else {
+            cleanup();
+        }
+    }
+
+    _runAction(id, state, progress) {
         const _LCASE = 32;
         if (id == 1) {
             //
             // MINIMIZE ACTION
             //
             if (this._isOnOverview()) {
-                return; // Ignore on overview
+                return;
             }
 
             let activeWin = null;
             let ui = this._actionWidgets.minimize;
 
-            // Init indicator
             if (!ui) {
                 activeWin = global.display.get_focus_window();
                 if (this._isWindowBlacklist(activeWin)) {
@@ -1791,7 +1521,6 @@ class Manager {
                 }
             }
 
-            // Execute Progress
             if (ui && ui != -1) {
                 if (!state) {
                     ui.set_pivot_point(0.5, 1);
@@ -1800,7 +1529,6 @@ class Manager {
                     ui.scale_y = 1.0 - (0.2 * progress);
                 }
                 else {
-                    // Action is executed
                     activeWin = null;
                     if (progress >= 1.0) {
                         activeWin = global.display.get_focus_window();
@@ -1811,7 +1539,6 @@ class Manager {
                         }
                     }
 
-                    // Restore
                     ui.ease({
                         duration: Math.round(250 * progress),
                         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -1850,13 +1577,12 @@ class Manager {
             // CLOSE WINDOW ACTION
             //
             if (this._isOnOverview()) {
-                return; // Ignore on overview
+                return;
             }
 
             let activeWin = null;
             let ui = this._actionWidgets.close;
 
-            // Init indicator
             if (!ui) {
                 activeWin = global.display.get_focus_window();
                 if (this._isWindowBlacklist(activeWin)) {
@@ -1876,7 +1602,6 @@ class Manager {
                 }
             }
 
-            // Execute Progress
             if (ui && ui != -1) {
                 if (!state) {
                     ui.set_pivot_point(0.5, 0.5);
@@ -1887,8 +1612,6 @@ class Manager {
                 }
                 else {
                     activeWin = null;
-
-                    // Action is executed
                     if (progress >= 1.0) {
                         activeWin = global.display.get_focus_window();
                     }
@@ -1915,31 +1638,30 @@ class Manager {
             //
             // SHOW DESKTOP
             //
-            if (this._isOnOverview()) { // Ignore on overview
+            if (this._isOnOverview()) {
                 return;
             }
 
             let ui = this._actionWidgets.show_desktop;
 
-            // Init indicator
             if (!ui) {
-                let monitorArea = global.display.list_all_windows();
-                if (monitorArea.length > 0) {
+                let allWindows = global.display.list_all_windows();
+                if (allWindows.length > 0) {
                     ui = [];
-                    for (var i = 0; i < monitorArea.length; i++) {
-                        if (!this._isWindowBlacklist(monitorArea[i])) {
-                            let aui = monitorArea[i].get_compositor_private();
+                    for (let i = 0; i < allWindows.length; i++) {
+                        if (!this._isWindowBlacklist(allWindows[i])) {
+                            let aui = allWindows[i].get_compositor_private();
 
                             if (aui) {
                                 ui.push(aui);
-                                let mrect = monitorArea[i]
+                                let mrect = allWindows[i]
                                     .get_work_area_current_monitor();
-                                let wrect = monitorArea[i].get_frame_rect();
+                                let wrect = allWindows[i].get_frame_rect();
 
-                                // black magic calc ;)
+                                // Calculate slide-out direction per window
                                 let wl = (mrect.width / 32);
                                 aui._t_targetx = (mrect.width - wl) - wrect.x;
-                                var nx = (0 - (wrect.width - wl)) - wrect.x;
+                                let nx = (0 - (wrect.width - wl)) - wrect.x;
                                 aui.set_pivot_point(1.0, 0.5);
                                 if (Math.abs(nx) < Math.abs(aui._t_targetx)) {
                                     aui._t_targetx = nx;
@@ -1958,7 +1680,6 @@ class Manager {
                 }
             }
 
-            // Execute Progress
             if (ui && ui != -1) {
                 if (!state) {
                     ui.forEach((aui) => {
@@ -1971,9 +1692,7 @@ class Manager {
                     });
                 }
                 else {
-                    // Action is executed
                     if (progress >= 1.0) {
-                        // Show Desktop (Super+D)  Clutter.KEY_D
                         this._sendKeyPress(
                             [Clutter.KEY_Super_L,
                             Clutter.KEY_D + _LCASE]
@@ -2008,14 +1727,12 @@ class Manager {
             // NEXT & PREVIOUS WINDOW/APPLICATION SWITCHING
             //
             if (this._isOnOverview()) {
-                return; // Ignore on overview
+                return;
             }
 
             let prv = (id == 5 || id == 25);
             let wid = prv ? "switchwin_prev" : "switchwin_next";
             let ui = this._actionWidgets[wid];
-
-            // Check if this should be application switching
             let isAppSwitching = (id == 24 || id == 25);
 
             // Init indicator
@@ -2024,7 +1741,6 @@ class Manager {
                 let wins = null;
                 let listActor = null;
 
-                // Cancel cache win timeout
                 if (this._actionWidgets.resetWinlist) {
                     clearTimeout(this._actionWidgets.resetWinlist);
                     this._actionWidgets.resetWinlist = 0;
@@ -2042,15 +1758,13 @@ class Manager {
                     }
                 }
                 if (!wins) {
-                    // No last cached
                     let useFixedOrder = this._settings.get_boolean('fixed-window-order');
                     if (isAppSwitching) {
-                        wins = useFixedOrder ? this._getApplicationListFixed() : this._getApplicationList();
+                        wins = this._getApplicationList(useFixedOrder);
                     } else {
-                        wins = useFixedOrder ? this._getWindowTabListFixed() : this._getWindowTabList();
+                        wins = this._getWindowTabList(useFixedOrder);
                     }
                     if (wins.length > 1) {
-                        // Create UI
                         let gsize = Main.layoutManager.uiGroup.get_size();
                         let pad = 8;
                         let posCfg = this._settings.get_int(
@@ -2061,15 +1775,13 @@ class Manager {
                         let lW = ((pad * 2) + (wins.length * 48)) * scale;
                         let lH = ((pad * 2) + 32) * scale;
                         let lX = (gsize[0] - lW) / 2;
-                        let lY = 64; // Top
+                        let lY = 64;
                         let pivY = 0;
                         if (posCfg == 1) {
-                            // Center
                             lY = (gsize[1] - lH) / 2;
                             pivY = 0.5;
                         }
                         else if (posCfg == 2) {
-                            // Bottom
                             lY = gsize[1] - (lH + 64 * scale);
                             pivY = 1;
                         }
@@ -2081,18 +1793,16 @@ class Manager {
                         listActor.scale_x = listActor.scale_y = 0.5;
                         listActor._data = [];
                         let iconSize = 32 * scale;
-                        for (var i = 0; i < wins.length; i++) {
+                        for (let i = 0; i < wins.length; i++) {
                             let item = wins[i];
                             let ico, app, win;
 
                             if (isAppSwitching) {
-                                // Application switching
                                 app = item.app;
                                 win = item.activeWindow;
                                 ico = app.create_icon_texture(iconSize);
                                 ico.add_style_class_name("wgs-appswitch-ico");
                             } else {
-                                // Window switching
                                 win = item;
                                 app = this._winmanWinApp(win);
                                 ico = app.create_icon_texture(iconSize);
@@ -2124,12 +1834,9 @@ class Manager {
                             scale_y: 1.0
                         }, 200);
 
-                        // Reorder for next (below 1s) calls
-                        let useFixedOrder = this._settings.get_boolean('fixed-window-order');
                         let currentIndex = 0;
 
                         if (useFixedOrder) {
-                            // Find current active window/app in the sorted list
                             let activeWindow = global.display.get_focus_window();
                             if (activeWindow) {
                                 if (isAppSwitching) {
@@ -2139,7 +1846,6 @@ class Manager {
                                     currentIndex = wins.findIndex(win => win === activeWindow);
                                 }
                             }
-                            // If not found, use 0 as default
                             if (currentIndex === -1) {
                                 currentIndex = 0;
                             }
@@ -2178,7 +1884,6 @@ class Manager {
                     let cache = isAppSwitching ? this._actionWidgets.cacheAppTabList : this._actionWidgets.cacheWinTabList;
 
                     if (useFixedOrder && cache && cache.useFixedOrder) {
-                        // Use fixed order with index
                         let currentIndex = cache.currentIndex;
                         let nextIndex;
 
@@ -2197,7 +1902,6 @@ class Manager {
                             nextIndex: nextIndex
                         };
                     } else {
-                        // Use original logic - find current active window/app
                         let activeWindow = global.display.get_focus_window();
                         let fromIndex = 0;
 
@@ -2239,8 +1943,7 @@ class Manager {
                     ui.from_actor.set_pivot_point(0.5, 1);
                     ui.into_actor.set_pivot_point(0.5, 1);
 
-                    // Set selected target
-                    for (var i = 0; i < listActor._data.length; i++) {
+                    for (let i = 0; i < listActor._data.length; i++) {
                         let d = listActor._data[i];
                         let fromMatch, intoMatch;
 
@@ -2271,105 +1974,73 @@ class Manager {
                 let useStableSwitching = this._settings.get_boolean('stable-window-switching');
 
                 if (!state) {
-                    try {
-                        if (ui.from_actor && !ui.from_actor.is_destroyed && ui.from_actor.is_destroyed !== undefined) {
-                            ui.from_actor.opacity = 255 - Math.round(80 * progress);
-                            ui.from_actor.scale_y =
-                                ui.from_actor.scale_x = 1.0 - (0.05 * progress);
-                        }
-                        if (ui.into_actor && !ui.into_actor.is_destroyed && ui.into_actor.is_destroyed !== undefined) {
-                            ui.into_actor.scale_y =
-                                ui.into_actor.scale_x = 1.0 + (0.05 * progress);
-                        }
-                    } catch (e) { }
+                    if (ui.from_actor) {
+                        ui.from_actor.opacity = 255 - Math.round(80 * progress);
+                        ui.from_actor.scale_y =
+                            ui.from_actor.scale_x = 1.0 - (0.05 * progress);
+                    }
+                    if (ui.into_actor) {
+                        ui.into_actor.scale_y =
+                            ui.into_actor.scale_x = 1.0 + (0.05 * progress);
+                    }
 
-                    // Determine when to switch based on stable mode
                     let shouldSwitch = useStableSwitching ? (progress > 0.1) : (progress > 0.8);
 
                     if (shouldSwitch) {
                         if (!ui.lstate) {
-                            try {
-                                if (isAppSwitching && ui.into && ui.into.activeWindow) {
-                                    ui.into.activeWindow.raise();
-                                } else if (ui.into) {
-                                    ui.into.raise();
-                                }
-                            } catch (e) { }
+                            if (isAppSwitching) {
+                                ui.into?.activeWindow?.raise();
+                            } else {
+                                ui.into?.raise();
+                            }
                             ui.lstate = 1;
                             ui.from_ico?.remove_style_class_name("selected");
                             ui.into_ico?.add_style_class_name("selected");
                         }
                     }
                     else if (ui.lstate) {
-                        try {
-                            if (isAppSwitching && ui.from && ui.from.activeWindow) {
-                                ui.from.activeWindow.raise();
-                            } else if (ui.from) {
-                                ui.from.raise();
-                            }
-                        } catch (e) { }
+                        if (isAppSwitching) {
+                            ui.from?.activeWindow?.raise();
+                        } else {
+                            ui.from?.raise();
+                        }
                         ui.lstate = 0;
                         ui.from_ico?.add_style_class_name("selected");
                         ui.into_ico?.remove_style_class_name("selected");
                     }
                 }
                 else {
-                    // In stable mode, always complete the switch when gesture ends
-                    let shouldComplete = useStableSwitching ? true : ((progress > 0.8) || ui.lstate);
+                    // shouldComplete is always true when stable switching,
+                    // otherwise requires sufficient progress or visual switch
+                    let shouldComplete = useStableSwitching || (progress > 0.8) || ui.lstate;
 
                     if (shouldComplete) {
-                        try {
-                            try {
-                                if (isAppSwitching && this._actionWidgets.cacheAppTabList &&
-                                    this._actionWidgets.cacheAppTabList.first &&
-                                    this._actionWidgets.cacheAppTabList.first.activeWindow) {
-                                    this._actionWidgets
-                                        .cacheAppTabList.first.activeWindow.activate(
-                                            Meta.CURRENT_TIME
-                                        );
-                                } else if (this._actionWidgets.cacheWinTabList &&
-                                    this._actionWidgets.cacheWinTabList.first) {
-                                    this._actionWidgets
-                                        .cacheWinTabList.first.activate(
-                                            Meta.CURRENT_TIME
-                                        );
-                                }
-                            } catch (e) { }
-                            try {
-                                if (isAppSwitching && ui.from && ui.from.activeWindow) {
-                                    ui.from.activeWindow.raise();
-                                } else if (ui.from) {
-                                    ui.from.raise();
-                                }
-                            } catch (e) { }
-                            if (isAppSwitching && ui.into && ui.into.activeWindow) {
-                                ui.into.activeWindow.activate(
-                                    Meta.CURRENT_TIME
-                                );
-                            } else if (ui.into) {
-                                ui.into.activate(
-                                    Meta.CURRENT_TIME
-                                );
-                            }
-                        } catch (e) { }
-                        let cache = isAppSwitching ? this._actionWidgets.cacheAppTabList : this._actionWidgets.cacheWinTabList;
+                        // Activate first, raise from, activate into
+                        if (isAppSwitching) {
+                            this._actionWidgets.cacheAppTabList
+                                ?.first?.activeWindow?.activate(Meta.CURRENT_TIME);
+                            ui.from?.activeWindow?.raise();
+                            ui.into?.activeWindow?.activate(Meta.CURRENT_TIME);
+                        } else {
+                            this._actionWidgets.cacheWinTabList
+                                ?.first?.activate(Meta.CURRENT_TIME);
+                            ui.from?.raise();
+                            ui.into?.activate(Meta.CURRENT_TIME);
+                        }
+
+                        // Update cache order
+                        let cache = isAppSwitching
+                            ? this._actionWidgets.cacheAppTabList
+                            : this._actionWidgets.cacheWinTabList;
                         if (cache && cache.useFixedOrder && ui.nextIndex !== undefined) {
-                            // Update index for fixed order mode
                             cache.currentIndex = ui.nextIndex;
                         } else if (cache) {
-                            // Use original reordering logic
-                            if (prv) {
-                                if (isAppSwitching && cache.apps && cache.apps.length > 0) {
-                                    cache.apps.unshift(cache.apps.pop());
-                                } else if (cache.wins && cache.wins.length > 0) {
-                                    cache.wins.unshift(cache.wins.pop());
-                                }
-                            }
-                            else {
-                                if (isAppSwitching && cache.apps && cache.apps.length > 0) {
-                                    cache.apps.push(cache.apps.shift());
-                                } else if (cache.wins && cache.wins.length > 0) {
-                                    cache.wins.push(cache.wins.shift());
+                            let list = isAppSwitching ? cache.apps : cache.wins;
+                            if (list?.length > 0) {
+                                if (prv) {
+                                    list.unshift(list.pop());
+                                } else {
+                                    list.push(list.shift());
                                 }
                             }
                         }
@@ -2377,95 +2048,30 @@ class Manager {
                         ui.into_ico?.add_style_class_name("selected");
                     }
                     else {
-                        // In stable mode, if we haven't switched yet, force a switch
-                        if (useStableSwitching && !ui.lstate) {
-                            try {
-                                if (isAppSwitching && ui.into && ui.into.activeWindow) {
-                                    ui.into.activeWindow.activate(Meta.CURRENT_TIME);
-                                } else if (ui.into) {
-                                    ui.into.activate(Meta.CURRENT_TIME);
-                                }
-                            } catch (e) { }
-
-                            // Update cache for next switch
-                            let cache = isAppSwitching ? this._actionWidgets.cacheAppTabList : this._actionWidgets.cacheWinTabList;
-                            if (cache && cache.useFixedOrder && ui.nextIndex !== undefined) {
-                                cache.currentIndex = ui.nextIndex;
-                            } else if (cache) {
-                                if (prv) {
-                                    if (isAppSwitching && cache.apps && cache.apps.length > 0) {
-                                        cache.apps.unshift(cache.apps.pop());
-                                    } else if (cache.wins && cache.wins.length > 0) {
-                                        cache.wins.unshift(cache.wins.pop());
-                                    }
-                                } else {
-                                    if (isAppSwitching && cache.apps && cache.apps.length > 0) {
-                                        cache.apps.push(cache.apps.shift());
-                                    } else if (cache.wins && cache.wins.length > 0) {
-                                        cache.wins.push(cache.wins.shift());
-                                    }
-                                }
-                            }
-                        }
+                        // Gesture cancelled - not enough progress
                         ui.from_ico?.add_style_class_name("selected");
                         ui.into_ico?.remove_style_class_name("selected");
                     }
+
+                    // Ease-restore both actors
                     ui.nclose = 0;
-                    // Ease Restore
-                    try {
-                        if (ui.from_actor && !ui.from_actor.is_destroyed && ui.from_actor.is_destroyed !== undefined) {
-                            ui.from_actor.ease({
-                                duration: Math.round(200 * progress),
-                                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                                opacity: 255,
-                                scale_x: 1,
-                                scale_y: 1,
-                                onStopped: () => {
-                                    if (ui.from_actor && !ui.from_actor.is_destroyed) {
-                                        ui.from_actor.set_pivot_point(0, 0);
-                                    }
-                                    ui.from_actor = null;
-                                    ui.from = null;
-                                    if (++ui.nclose == 2) {
-                                        ui = null;
-                                    }
-                                }
-                            });
-                        } else {
-                            ui.from_actor = null;
-                            ui.from = null;
-                            if (++ui.nclose == 2) {
-                                ui = null;
-                            }
+                    this._easeRestoreActor(ui.from_actor, progress, () => {
+                        ui.from_actor = null;
+                        ui.from = null;
+                        if (++ui.nclose == 2) {
+                            ui = null;
                         }
-                    } catch (e) { }
-                    try {
-                        if (ui.into_actor && !ui.into_actor.is_destroyed && ui.into_actor.is_destroyed !== undefined) {
-                            ui.into_actor.ease({
-                                duration: Math.round(200 * progress),
-                                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                                opacity: 255,
-                                scale_x: 1,
-                                scale_y: 1,
-                                onStopped: () => {
-                                    if (ui.into_actor && !ui.into_actor.is_destroyed) {
-                                        ui.into_actor.set_pivot_point(0, 0);
-                                    }
-                                    ui.into_actor = null;
-                                    ui.into = null;
-                                    if (++ui.nclose == 2) {
-                                        ui = null;
-                                    }
-                                }
-                            });
-                        } else {
+                    });
+                    this._easeRestoreActor(ui?.into_actor, progress, () => {
+                        if (ui) {
                             ui.into_actor = null;
                             ui.into = null;
                             if (++ui.nclose == 2) {
                                 ui = null;
                             }
                         }
-                    } catch (e) { }
+                    });
+
                     this._actionWidgets[wid] = null;
 
                     // Clear cache after timeout
@@ -2473,10 +2079,7 @@ class Manager {
                     if (isAppSwitching) {
                         this._actionWidgets.resetApplist = setTimeout(
                             function () {
-                                if (me._actionWidgets.cacheAppTabList &&
-                                    me._actionWidgets.cacheAppTabList.actor) {
-                                    me._actionWidgets.cacheAppTabList.actor.aniRelease();
-                                }
+                                me._actionWidgets.cacheAppTabList?.actor?.aniRelease();
                                 me._actionWidgets.cacheAppTabList = null;
                                 clearTimeout(me._actionWidgets.resetApplist);
                                 me._actionWidgets.resetApplist = 0;
@@ -2485,10 +2088,7 @@ class Manager {
                     } else {
                         this._actionWidgets.resetWinlist = setTimeout(
                             function () {
-                                if (me._actionWidgets.cacheWinTabList &&
-                                    me._actionWidgets.cacheWinTabList.actor) {
-                                    me._actionWidgets.cacheWinTabList.actor.aniRelease();
-                                }
+                                me._actionWidgets.cacheWinTabList?.actor?.aniRelease();
                                 me._actionWidgets.cacheWinTabList = null;
                                 clearTimeout(me._actionWidgets.resetWinlist);
                                 me._actionWidgets.resetWinlist = 0;
@@ -2506,7 +2106,7 @@ class Manager {
             // SEND WINDOW LEFT/RIGHT WORKSPACE
             //
             if (this._isOnOverview()) {
-                return; // Ignore on overview
+                return;
             }
 
             let prv = (id == 6);
@@ -2514,7 +2114,6 @@ class Manager {
             let ui = this._actionWidgets[wid];
             let activeWin = null;
 
-            // Init indicator
             if (!ui) {
                 ui = -1;
                 let isDynamic = this._isDynamicWorkspace();
@@ -2529,8 +2128,7 @@ class Manager {
                                 let wpl = activeWin.get_workspace().list_windows();
                                 inserted = wpl.length;
                                 if (inserted > 1) {
-                                    // Check for blacklisted windows
-                                    for (var i = 0; i < inserted; i++) {
+                                    for (let i = 0; i < inserted; i++) {
                                         if (this._isWindowBlacklist(wpl[i])) {
                                             inserted--;
                                         }
@@ -2553,9 +2151,6 @@ class Manager {
                         }
                         tsid++;
                     }
-                    // Make sure move left from left-most workspace only
-                    // triggered if other window is available in
-                    // current workspace
                     if (inserted !== 1) {
                         activeWin.stick();
                         if (inserted) {
@@ -2582,7 +2177,7 @@ class Manager {
                     ui.wm._switchWorkspaceUpdate(
                         ui,
                         ui.sid + ((prv) ? 0 - progress : progress)
-                    )
+                    );
                 }
                 else {
                     ui.win.unstick();
@@ -2600,7 +2195,6 @@ class Manager {
                             );
                     }
                     else if (ui.ins) {
-                        // list_windows
                         if (ui.ins > 1) {
                             ui.win.change_workspace_by_index(
                                 ui.sid, true
@@ -2625,7 +2219,7 @@ class Manager {
             // BACK / FORWARD
             //
             if (this._isOnOverview()) {
-                return; // Ignore on overview
+                return;
             }
 
             const keyList = [
@@ -2637,18 +2231,16 @@ class Manager {
             let kidw = kid ? 'btnforward' : 'btnback';
             let ui = this._actionWidgets[kidw];
 
-            // Init indicator
             if (!ui) {
-                let display = global.get_display()
+                let display = global.display;
                 activeWin = display.get_focus_window();
                 if (this._isWindowBlacklist(activeWin)) {
                     activeWin = null;
                 }
                 if (activeWin) {
                     let wrect = activeWin.get_frame_rect();
-                    let primary_scale = 1.0;
                     let primary_monitor = display.get_primary_monitor();
-                    primary_scale = display.get_monitor_scale(primary_monitor);
+                    let primary_scale = display.get_monitor_scale(primary_monitor);
                     let win_monitor = activeWin.get_monitor();
                     let win_scale = 1.0;
                     if (win_monitor >= 0) {
@@ -2686,7 +2278,6 @@ class Manager {
                 }
             }
 
-            // Execute Progress
             if (ui && ui != -1) {
                 if (!state) {
                     if (kid) {
@@ -2698,7 +2289,6 @@ class Manager {
                     ui.opacity = Math.round(255 * progress);
                 }
                 else {
-                    // Action is executed
                     if (progress >= 1.0) {
                         this._sendKeyPress([keyList[kid]]);
                     }
@@ -2723,7 +2313,6 @@ class Manager {
                 Clutter.KEY_AudioNext,
                 Clutter.KEY_AudioPrev
             ];
-            let wid = 'keys_' + id;
             let cid = 'keysn_' + id;
             let keyId = keyList[id - 10];
             let isRepeat = (id < 14);
@@ -2758,9 +2347,9 @@ class Manager {
                 }
             }
             else {
-                let display = global.get_display();
+                let display = global.display;
                 let monitor = display.get_primary_monitor();
-                let scale = display.get_monitor_scale(display);
+                let scale = display.get_monitor_scale(monitor);
                 if (!ui) {
                     const iconlist = [
                         'audio-volume-muted-symbolic',
@@ -2782,14 +2371,12 @@ class Manager {
                     this._actionWidgets[kidw] = ui;
                 }
 
-                // Execute Progress
                 if (ui && ui != -1) {
                     if (!state) {
                         ui.scale_x = ui.scale_y = progress / scale;
                         ui.opacity = Math.round(255 * progress);
                     }
                     else {
-                        // Action is executed
                         if (progress >= 1.0) {
                             this._sendKeyPress([keyId]);
                         }
@@ -2809,19 +2396,15 @@ class Manager {
         //
         else if (id == 18) {
             if (this._isOnOverview()) {
-                // Ignore on overview
                 return;
             }
             if (!state || progress < 1.0) {
-                // Ignore if non end
                 return;
             }
-            // ALT+TAB
             this._sendKeyPress([Clutter.KEY_Alt_L, Clutter.KEY_Tab]);
         }
         else if (id == 19 || id == 20) {
             if (!state || progress < 1.0) {
-                // Ignore if non end
                 return;
             }
             if (id == 19) {
@@ -2833,41 +2416,33 @@ class Manager {
         }
         else if (id == 21) {
             if (!state || progress < 1.0) {
-                // Ignore if non end
                 return;
             }
-            // Quick Settings (Super+S)
             Main.wm._toggleQuickSettings();
-            // this._sendKeyPress([Clutter.KEY_Super_L, Clutter.KEY_S + _LCASE]);
         }
         else if (id == 22) {
             if (!state || progress < 1.0) {
-                // Ignore if non end
                 return;
             }
-            // Notification (Super+V)
             Main.wm._toggleCalendar();
-            // this._sendKeyPress([Clutter.KEY_Super_L, Clutter.KEY_V + _LCASE]);
         }
         else if (id == 23) {
             if (!state || progress < 1.0) {
-                // Ignore if non end
                 return;
             }
-            // Run (Alt+F2)
             this._sendKeyPress([Clutter.KEY_Alt_L, Clutter.KEY_F2]);
         }
 
         else if (id >= 50 && id <= 53) {
             //
-            // Maximized, Fullscreen, Spap Etc.
+            // Maximized, Fullscreen, Snap Etc.
             //
             let activeWin = global.display.get_focus_window();
             if (!activeWin || this._isOnOverview()) {
-                return; // Ignore on overview & no active window
+                return;
             }
             if (this._isWindowBlacklist(activeWin)) {
-                return; // Ignore blacklisted
+                return;
             }
 
             let winCanMax = activeWin.allows_move() && activeWin.can_maximize();
@@ -2881,44 +2456,40 @@ class Manager {
             }
             let winIsFullscreen = activeWin.is_fullscreen();
             let allowFullscreen = this._getEnableFullscreen();
-            let ui = 0; // find action id
+            let ui = 0;
             if (id < 53) {
-                // Maximize
                 if (winMaxed) {
                     if (winIsFullscreen) {
-                        ui = 5; // un-fullscreen
+                        ui = 5;
                     }
                     else if (allowFullscreen) {
-                        ui = 4; // fullscreen
+                        ui = 4;
                     }
                     else {
-                        ui = 6; // if not allow fullscreen (restore)
+                        ui = 6;
                     }
                 }
                 else if (winCanMax) {
-                    // 1. Max, 2. Snap Left, 3. Snap Right
                     ui = id - 49;
                 }
             }
             else if (winIsFullscreen) {
-                ui = 5; // un-fullscreen
+                ui = 5;
             }
             else if (winIsMaximized) {
-                ui = 6; // restore
+                ui = 6;
             }
             let wid = "wmax_state" + ui;
 
             if (ui) {
                 if (!state) {
                     if (ui == 4) {
-                        // fullsccreen
                         activeWin?.get_compositor_private()
                             .set_pivot_point(0.5, 1);
                         activeWin.get_compositor_private().scale_y =
                             1.0 + (progress * 0.025);
                     }
                     else if (ui >= 5) {
-                        // un-fullsccreen / restore
                         activeWin?.get_compositor_private()
                             .set_pivot_point(0.5, 1);
                         if (ui == 6) {
@@ -2940,7 +2511,6 @@ class Manager {
                             let moarea = activeWin
                                 .get_work_area_current_monitor();
                             if (ui == 1) {
-                                // max
                                 this._showPreview(
                                     moarea.x,
                                     moarea.y,
@@ -2949,7 +2519,6 @@ class Manager {
                                 );
                             }
                             else if (ui == 2) {
-                                // snap left
                                 this._showPreview(
                                     moarea.x,
                                     moarea.y,
@@ -2958,7 +2527,6 @@ class Manager {
                                 );
                             }
                             else if (ui == 3) {
-                                // snap right
                                 this._showPreview(
                                     moarea.x
                                     + (moarea.width / 2),
@@ -2973,7 +2541,6 @@ class Manager {
                 }
                 else {
                     if (ui <= 3) {
-                        // max, snap
                         if (this._actionWidgets.tilerHider) {
                             clearTimeout(this._actionWidgets.tilerHider);
                             this._actionWidgets.tilerHider = null;
@@ -2997,7 +2564,6 @@ class Manager {
                         this._actionWidgets[wid] = 0;
                     }
                     else {
-                        // resize back
                         activeWin?.get_compositor_private().ease({
                             duration: Math.round(200 * progress),
                             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -3010,15 +2576,12 @@ class Manager {
                         });
                         if (progress >= 0.5) {
                             if (ui == 4) {
-                                // fullscreen
                                 activeWin.make_fullscreen();
                             }
                             else if (ui == 5) {
-                                // un-fullscreen
                                 activeWin.unmake_fullscreen();
                             }
                             else if (ui == 6) {
-                                // restore
                                 activeWin.set_unmaximize_flags(
                                     Meta.MaximizeFlags.BOTH
                                 );
@@ -3038,65 +2601,26 @@ class Manager {
         //
     }
 
-    // Update fixed order index when window list changes
-    _updateFixedOrderIndex(cache, currentWindow, isAppSwitching) {
-        if (!cache || !cache.useFixedOrder) return;
-
-        let wins = isAppSwitching ? cache.apps : cache.wins;
-        if (!wins || wins.length === 0) return;
-
-        // Find current window in the list
-        let newIndex = 0;
-        if (currentWindow) {
-            if (isAppSwitching) {
-                let currentApp = this._winmanWinApp(currentWindow);
-                newIndex = wins.findIndex(item => item.app === currentApp);
-            } else {
-                newIndex = wins.findIndex(win => win === currentWindow);
-            }
-        }
-
-        // If not found, use 0 as default
-        if (newIndex === -1) {
-            newIndex = 0;
-        }
-
-        cache.currentIndex = newIndex;
-    }
-
-    // Get process creation time by PID
     _getProcessCreationTime(pid) {
         try {
-            // Try to read from /proc/{pid}/stat
-            let statFile = Gio.File.new_for_path(`/proc/${pid}/stat`);
-            if (statFile.query_exists(null)) {
-                let [success, contents] = statFile.load_contents(null);
-                if (success) {
-                    let decoder = new TextDecoder();
-                    let statText = decoder.decode(contents);
-                    let statData = statText.split(' ');
-                    // The 22nd field (index 21) contains the start time in jiffies
-                    let startTime = parseInt(statData[21]);
-                    return startTime;
-                }
+            let [success, contents] =
+                Gio.File.new_for_path(`/proc/${pid}/stat`).load_contents(null);
+            if (success) {
+                let statData = new TextDecoder().decode(contents).split(' ');
+                return parseInt(statData[21]);
             }
-        } catch (e) {
-            // If we can't read the stat file, fall back to window ID
+        } catch (_) {
+            // Process may have exited or /proc may be inaccessible
         }
-
-        // Fallback: return a large number to put unknown processes at the end
         return Number.MAX_SAFE_INTEGER;
     }
 }
 
 // Export Extension
 export default class WindowGesturesExtension extends Extension {
-    // Enable Extension
     enable() {
         this.manager = new Manager(this);
     }
-
-    // Disable Extension
     disable() {
         this.manager.destroy();
         this.manager = null;
