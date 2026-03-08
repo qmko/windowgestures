@@ -25,8 +25,6 @@ import { PACKAGE_VERSION } from 'resource:///org/gnome/Shell/Extensions/js/misc/
 
 export default class extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const GNOME_VER = parseFloat(PACKAGE_VERSION);
-    const SUPPORT_PINCH = (GNOME_VER < 46) || (GNOME_VER >= 48.2);
         const WEBSITE_LINK = "https://github.com/qmko/windowgestures";
         const PAYPAL_LINK = "https://paypal.me/amarullz";
         const GNU_SOFTWARE = '<span size="small">' +
@@ -48,23 +46,19 @@ export default class extends ExtensionPreferences {
             "Use active window",
             "If true, gesture will control active window rather than window on current pointer. This will disable resize function"
         );
-
         this._createSwitch(
             gestures, "taphold-move",
             "Tap and hold to move/resize window",
             "Trigger move window by tap and hold rather than by swipe down"
         );
 
-
         // Function Settings
         const fn = new Adw.PreferencesGroup({ title: "Active Functions" });
-        if (SUPPORT_PINCH) {
-            this._createSwitch(
-                fn, "pinch-enable",
-                "Enable pinch gestures",
-                ""
-            );
-        }
+        this._createSwitch(
+            fn, "pinch-enable",
+            "Enable pinch gestures",
+            ""
+        );
         this._createSwitch(
             fn, "fn-resize",
             "Enable resize window",
@@ -107,13 +101,10 @@ export default class extends ExtensionPreferences {
             "Minimize window",      // 1
             "Close window",         // 2
             "Show desktop",         // 3
-
             "Next window",          // 4
             "Previous window",      // 5
-
             "Send window left",     // 6
             "Send window right",    // 7
-
             "Back",                 // 8
             "Forward",              // 9
             "Brightness up",        // 10
@@ -124,17 +115,14 @@ export default class extends ExtensionPreferences {
             "Media play",           // 15
             "Media next",           // 16
             "Media previous",       // 17
-
             "Alt+Tab switch",       // 18
             "Overview",             // 19
             "Application Grid",     // 20
             "Quick settings",       // 21
             "Notification",         // 22
             "Run (Alt+F2)",         // 23
-
             "Next application",     // 24
             "Previous application", // 25
-
         ];
 
         const act1 = new Adw.PreferencesGroup({
@@ -161,19 +149,15 @@ export default class extends ExtensionPreferences {
         this._createCombo(act2, "swipe3-downup",
             "Swipe down > up", "", action_list);
 
-        var act3 = null;
-        if (SUPPORT_PINCH) {
-            act3 = new Adw.PreferencesGroup({ title: "Pinch Actions" });
-            this._createCombo(act3, "pinch3-in",
-                "Pinch-in 3 fingers", "", action_list);
-            this._createCombo(act3, "pinch3-out",
-                "Pinch-out 3 fingers", "", action_list);
-            this._createCombo(act3, "pinch4-in",
-                "Pinch-in 4 fingers", "", action_list);
-            this._createCombo(act3, "pinch4-out",
-                "Pinch-out 4 fingers", "", action_list);
-        }
-
+        const act3 = new Adw.PreferencesGroup({ title: "Pinch Actions" });
+        this._createCombo(act3, "pinch3-in",
+            "Pinch-in 3 fingers", "", action_list);
+        this._createCombo(act3, "pinch3-out",
+            "Pinch-out 3 fingers", "", action_list);
+        this._createCombo(act3, "pinch4-in",
+            "Pinch-in 4 fingers", "", action_list);
+        this._createCombo(act3, "pinch4-out",
+            "Pinch-out 4 fingers", "", action_list);
 
         // Function Settings
         const ui = new Adw.PreferencesGroup({ title: "User Interface" });
@@ -185,7 +169,6 @@ export default class extends ExtensionPreferences {
             "Window switch ui position", "", [
             "Top", "Center", "Bottom"
         ]);
-
 
         // Tweaks Settings
         const tweaks = new Adw.PreferencesGroup({ title: "Tweaks" });
@@ -209,17 +192,14 @@ export default class extends ExtensionPreferences {
             "Gesture acceleration",
             "",
             10, 25, 1);
-        if (SUPPORT_PINCH) {
-            this._createSpin(tweaks, "pinch-in-scale",
-                "Pinch in scale target",
-                "",
-                30, 80, 5);
-            this._createSpin(tweaks, "pinch-out-scale",
-                "Pinch out scale target",
-                "",
-                120, 200, 5);
-        }
-
+        this._createSpin(tweaks, "pinch-in-scale",
+            "Pinch in scale target",
+            "",
+            30, 80, 5);
+        this._createSpin(tweaks, "pinch-out-scale",
+            "Pinch out scale target",
+            "",
+            120, 200, 5);
 
         // About
         const about = new Adw.PreferencesGroup({ title: "About" });
@@ -267,9 +247,7 @@ export default class extends ExtensionPreferences {
         page.add(gestures);
         page.add(act1);
         page.add(act2);
-        if (SUPPORT_PINCH && act3) {
-            page.add(act3);
-        }
+        page.add(act3);
         page.add(fn);
         page.add(ui);
         page.add(tweaks);
@@ -289,7 +267,7 @@ export default class extends ExtensionPreferences {
             bind, el, 'active', Gio.SettingsBindFlags.DEFAULT);
     }
 
-    /* Create Switch Config */
+    /* Create Spin Config */
     _createSpin(parent, bind, title, subtitle, min, max, inc) {
         const el = new Adw.SpinRow({
             title: title,
